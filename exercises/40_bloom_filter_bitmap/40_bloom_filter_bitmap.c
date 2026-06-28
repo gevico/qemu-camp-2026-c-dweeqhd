@@ -2,70 +2,85 @@
 #include <stdlib.h>
 #include <string.h>
 
-/*
- * 20 位图实现 Bloom 过滤器
- * 需求：m=100 位图，k=3 个哈希函数；插入 "apple"、"banana"，查询示例
- */
-
 typedef struct {
     unsigned char *bits;
-    size_t m; /* 位图大小（比特） */
+    size_t m;
 } Bloom;
 
 static Bloom *bloom_create(size_t m) {
-    // TODO: 在这里添加你的代码
-    // I AM NOT DONE
+    if (m == 0) {
+        return NULL;
+    }
+
+    Bloom *bf = (Bloom *)calloc(1, sizeof(*bf));
+    if (!bf) {
+        return NULL;
+    }
+
+    size_t bytes = (m + 7) / 8;
+    bf->bits = (unsigned char *)calloc(bytes, sizeof(*bf->bits));
+    if (!bf->bits) {
+        free(bf);
+        return NULL;
+    }
+    bf->m = m;
+    return bf;
 }
 
 static void bloom_free(Bloom *bf) {
-    // TODO: 在这里添加你的代码
-    // I AM NOT DONE
+    if (!bf) {
+        return;
+    }
+    free(bf->bits);
+    free(bf);
 }
 
-/* 位操作 */
 static void set_bit(unsigned char *bm, size_t idx) {
-    // TODO: 在这里添加你的代码
-    // I AM NOT DONE
-}
-static int test_bit(const unsigned char *bm, size_t idx) {
-    // TODO: 在这里添加你的代码
-    // I AM NOT DONE
+    bm[idx / 8] |= (unsigned char)(1u << (idx % 8));
 }
 
-/* 三个简单哈希：sum(c*k) % m */
+static int test_bit(const unsigned char *bm, size_t idx) {
+    return (bm[idx / 8] >> (idx % 8)) & 1u;
+}
+
 static size_t hash_k(const char *s, size_t m, int k) {
-    // TODO: 在这里添加你的代码
-    // I AM NOT DONE
+    size_t h = 1469598103934665603ULL + (size_t)k * 1099511628211ULL;
+    while (*s) {
+        h ^= (unsigned char)*s + (unsigned)k;
+        h *= 1099511628211ULL;
+        s++;
+    }
+    return h % m;
 }
 
 static void bloom_add(Bloom *bf, const char *s) {
-    // TODO: 在这里添加你的代码
-    // I AM NOT DONE
+    for (int k = 1; k <= 3; ++k) {
+        set_bit(bf->bits, hash_k(s, bf->m, k));
+    }
 }
 
 static int bloom_maybe_contains(Bloom *bf, const char *s) {
-    // TODO: 在这里添加你的代码
-    // I AM NOT DONE
+    for (int k = 1; k <= 3; ++k) {
+        if (!test_bit(bf->bits, hash_k(s, bf->m, k))) {
+            return 0;
+        }
+    }
+    return 1;
 }
 
 int main(void) {
-    const size_t m = 100; /* 位图大小 */
+    const size_t m = 100;
     Bloom *bf = bloom_create(m);
     if (!bf) {
         fprintf(stderr, "bloom create failed\n");
         return 1;
     }
 
-    /* 插入元素："apple"、"banana" */
     bloom_add(bf, "apple");
     bloom_add(bf, "banana");
 
-    /* 查询元素："apple"（应存在）、"orange"（可能存在误判） */
-    int apple = bloom_maybe_contains(bf, "apple");
-    int grape = bloom_maybe_contains(bf, "grape"); /* 未插入，可能误判 */
-
-    printf("apple exists: %d\n", apple); /* 必须为 1（无假阴性） */
-    printf("grape exists: %d\n", grape); /* 允许 0 或 1（可能误判） */
+    printf("apple exists: %d\n", bloom_maybe_contains(bf, "apple"));
+    printf("grape exists: %d\n", bloom_maybe_contains(bf, "grape"));
 
     bloom_free(bf);
     return 0;

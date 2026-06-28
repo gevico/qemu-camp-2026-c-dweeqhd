@@ -4,52 +4,77 @@
 
 typedef int (*CompareFunc)(const void *, const void *);
 
-int compareInt(const void *a, const void *b) {
-    return (*(int*)a - *(int*)b);
+static int compare_int(const void *a, const void *b) {
+    int x = *(const int *)a;
+    int y = *(const int *)b;
+    return (x > y) - (x < y);
 }
 
-int compareFloat(const void *a, const void *b) {
-    float diff = (*(float*)a - *(float*)b);
-    return (diff > 0) ? 1 : ((diff < 0) ? -1 : 0);
+static int compare_float(const void *a, const void *b) {
+    float x = *(const float *)a;
+    float y = *(const float *)b;
+    return (x > y) - (x < y);
 }
 
-int compareString(const void *a, const void *b) {
-    return strcmp(*(char**)a, *(char**)b);
+static int compare_string(const void *a, const void *b) {
+    const char *const *x = a;
+    const char *const *y = b;
+    return strcmp(*x, *y);
 }
 
-void sort(void *array, size_t n, size_t size, CompareFunc compare) {
+static void sort(void *array, size_t n, size_t size, CompareFunc compare) {
     qsort(array, n, size, compare);
 }
 
-void processFile(const char *filename) {
+static void process_file(const char *filename) {
     FILE *fin = fopen(filename, "r");
     if (!fin) {
-        printf("错误: 无法打开文件 %s\n", filename);
         return;
     }
 
-    int choice, n;
-    if (fscanf(fin, "%d", &choice) != 1 || fscanf(fin, "%d", &n) != 1) {
-        printf("错误: 文件 %s 格式不正确\n", filename);
+    int choice = 0;
+    int n = 0;
+    if (fscanf(fin, "%d%d", &choice, &n) != 2 || n < 0 || n > 20) {
         fclose(fin);
         return;
     }
 
-    if (n > 20) n = 20;  // 最多支持20个元素
-
-    printf("=== 处理数据来自: %s ===\n", filename);
-
-    switch (choice) {
-        // TODO: 在这里添加你的代码
-        // I AM NOT DONE
+    if (choice == 1) {
+        int values[20];
+        for (int i = 0; i < n; i++) {
+            fscanf(fin, "%d", &values[i]);
+        }
+        sort(values, n, sizeof(values[0]), compare_int);
+        for (int i = 0; i < n; i++) {
+            printf("%d%s", values[i], i == n - 1 ? "\n" : " ");
+        }
+    } else if (choice == 2) {
+        float values[20];
+        for (int i = 0; i < n; i++) {
+            fscanf(fin, "%f", &values[i]);
+        }
+        sort(values, n, sizeof(values[0]), compare_float);
+        for (int i = 0; i < n; i++) {
+            printf("%.2f%s", values[i], i == n - 1 ? "\n" : " ");
+        }
+    } else if (choice == 3) {
+        char storage[20][64];
+        char *values[20];
+        for (int i = 0; i < n; i++) {
+            fscanf(fin, "%63s", storage[i]);
+            values[i] = storage[i];
+        }
+        sort(values, n, sizeof(values[0]), compare_string);
+        for (int i = 0; i < n; i++) {
+            printf("%s%s", values[i], i == n - 1 ? "\n" : " ");
+        }
     }
 
     fclose(fin);
 }
 
-int main() {
-    processFile("int_sort.txt");
-    processFile("float_sort.txt");
-
+int main(void) {
+    process_file("int_sort.txt");
+    process_file("float_sort.txt");
     return 0;
 }

@@ -1,38 +1,47 @@
-// main.c
 #include <stdio.h>
-#include <stdlib.h>
 
 #include "doubly_circular_queue.h"
 
-// 使用通用双向链表实现队列：
-// - 入队：头插（insert(make_node(v)))
-// - 出队：删除最后一个结点（tail 前的结点）
+static link last_node = NULL;
 
-static link g_last = NULL;
-static void capture_last(link p) { g_last = p; }
+static void capture_last(link p) {
+    last_node = p;
+}
+
 static link get_last(void) {
-    g_last = NULL;
+    last_node = NULL;
     traverse(capture_last);
-    return g_last;  // 若为空表示队列为空
+    return last_node;
 }
 
 static void enqueue_int(int v) {
-    // TODO: 在这里添加你的代码
-    // I AM NOT DONE
+    insert(make_node(v));
 }
 
 static int dequeue_int(int *out) {
-    // TODO: 在这里添加你的代码
-    // I AM NOT DONE
+    link p = get_last();
+    if (!p) {
+        return 0;
+    }
+    if (out) {
+        *out = p->data;
+    }
+    delete(p);
+    free_node(p);
+    return 1;
 }
 
 static void print_dequeue_n(int n) {
-    // TODO: 在这里添加你的代码
-    // I AM NOT DONE
+    for (int i = 0; i < n; i++) {
+        int value;
+        if (!dequeue_int(&value)) {
+            return;
+        }
+        printf("%d%s", value, i == n - 1 ? "" : " ");
+    }
 }
 
 int main(void) {
-    // 基本 FIFO 顺序：1 2 3
     enqueue_int(1);
     enqueue_int(2);
     enqueue_int(3);
@@ -40,19 +49,13 @@ int main(void) {
     printf("\n");
     destroy();
 
-    // 单元素队列：42
     enqueue_int(42);
     printf("single: ");
     print_dequeue_n(1);
     printf("\n");
     destroy();
 
-    // 空队列出队：OK（0 代表出队失败）
-    {
-        int ok = dequeue_int(NULL);
-        printf("empty: %s\n", ok ? "NG" : "OK");
-    }
+    printf("empty: %s\n", dequeue_int(NULL) ? "NG" : "OK");
     destroy();
-
     return 0;
 }

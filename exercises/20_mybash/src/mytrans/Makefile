@@ -1,26 +1,22 @@
-# src/mytrans/Makefile
-
-CC = gcc
-CFLAGS = -Wall -I../../include
-
-# 库名称
-LIBNAME := mytrans
-# 静态库输出名：libmytrans.a
-LIB := lib$(LIBNAME).a
-# 最终库输出目录（比如 ./obj/src/mytrans/）
-OBJDIR ?= ./obj
-# 最终 .a 文件路径
+CC ?= gcc
+CFLAGS ?= -Wall -Wextra -O2 -std=c11 -I../../include
+AR ?= ar
+OBJDIR ?= ../../obj/mytrans
+LIB := libmytrans.a
 LIB_PATH := $(OBJDIR)/$(LIB)
-
-# 源文件
 SRCS := mytrans.c myhash.c
-OBJS := $(SRCS:.c=.o)
-OBJS := $(patsubst %.o,$(OBJDIR)/%.o,$(OBJS))
+OBJS := $(patsubst %.c,$(OBJDIR)/%.o,$(SRCS))
+
+.PHONY: all clean
 
 all: $(LIB_PATH)
 
-# TODO: 在这里添加你的代码
-# I AM NOT DONE
+$(LIB_PATH): $(OBJS)
+	$(AR) rcs $@ $^
+
+$(OBJDIR)/%.o: %.c
+	@mkdir -p $(OBJDIR)
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
-	@rm -rf $(OBJDIR)/*.o $(LIB_PATH)
+	rm -rf $(OBJDIR)

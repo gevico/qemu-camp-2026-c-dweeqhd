@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/wait.h>
 #include <unistd.h>
 
 #include "common.h"
@@ -9,202 +8,157 @@
 #define MAX_INPUT 1024
 #define MAX_ARGS 64
 
-// ======================
-// 自定义命令系统
-// ======================
-
-// 函数指针类型定义
 typedef int (*cmd_func_0_t)(void);
-typedef int (*cmd_func_1_t)(const char*);
-typedef int (*cmd_func_2_t)(const char*, const char*);
+typedef int (*cmd_func_1_t)(const char *);
+typedef int (*cmd_func_2_t)(const char *, const char *);
 
-// 命令结构体
 typedef struct {
-    const char *name;             // 命令名，如 "myfile"
-    int is_arg_required;          // 是否需要参数：1 需要，0 不需要
+    const char *name;
+    int argc_required;
     union {
-        cmd_func_0_t func_0;      // 无参数函数
-        cmd_func_1_t func_1;      // 带一个 const char* 参数的函数
+        cmd_func_0_t func_0;
+        cmd_func_1_t func_1;
         cmd_func_2_t func_2;
     } func;
 } Command;
 
-// 命令表：手动注册所有支持的外部命令
-Command commands[] = {
-    {"myfile", 1, .func.func_1 = __cmd_myfile},   // 需要 1 个参数
-    {"mysed",  2, .func.func_2 = __cmd_mysed},    // 需要 2 个参数
-    {"mytrans", 1, .func.func_1 = __cmd_mytrans}, // 需要 1 个参数
-    {"mywc", 1, .func.func_1 = __cmd_mywc},       // 需要 1 个参数
-    {NULL, 0, .func.func_0 = NULL}                // 结束标记
+static Command commands[] = {
+    {"myfile", 1, .func.func_1 = __cmd_myfile},
+    {"mysed", 2, .func.func_2 = __cmd_mysed},
+    {"mytrans", 1, .func.func_1 = __cmd_mytrans},
+    {"mywc", 1, .func.func_1 = __cmd_mywc},
+    {NULL, 0, .func.func_0 = NULL},
 };
 
-// ======================
-// 原有内置命令 & 工具函数
-// ======================
-
-void execute_cd(char **args) {
-  if (args[1] == NULL) {
-    fprintf(stderr, "mybash: expected argument to \"cd\"\n");
-  } else {
-    if (chdir(args[1]) != 0) {
-      perror("mybash");
+static char *dup_string(const char *s) {
+    size_t len = strlen(s);
+    char *copy = malloc(len + 1);
+    if (!copy) {
+        return NULL;
     }
-  }
+    memcpy(copy, s, len + 1);
+    return copy;
 }
 
-void execute_exit() { exit(0); }
+static void free_args(char **args) {
+    for (int i = 0; args[i] != NULL; i++) {
+        free(args[i]);
+        args[i] = NULL;
+    }
+}
 
-int is_builtin_command(char **args) {
-  if (args[0] == NULL)
+static void execute_cd(char **args) {
+    if (args[1] == NULL) {
+        fprintf(stderr, "mybash: expected argument to cd\n");
+    } else if (chdir(args[1]) != 0) {
+        perror("mybash");
+    }
+}
+
+static int is_builtin_command(char **args) {
+    if (args[0] == NULL) {
+        return 0;
+    }
+    if (strcmp(args[0], "cd") == 0) {
+        execute_cd(args);
+        return 1;
+    }
+    if (strcmp(args[0], "exit") == 0) {
+        exit(0);
+    }
     return 0;
-
-  // TODO: 在这里添加你的代码
-  // I AM NOT DONE
-
-  return 0;
 }
 
-int parse_input(char *input, char **args) {
-  int i = 0;
-  int in_quotes = 0;
-  char *buf = input;
-  char *arg_start = NULL;
-  char arg_buf[MAX_INPUT];  // 临时存储当前正在解析的参数
-  int arg_buf_idx = 0;
+static int parse_input(char *input, char **args) {
+    int argc = 0;
+    int in_quotes = 0;
+    char arg_buf[MAX_INPUT];
+    int idx = 0;
 
-  memset(arg_buf, 0, sizeof(arg_buf));
+    for (char *p = input; *p != '\0' && argc < MAX_ARGS - 1; p++) {
+        char c = *p;
+        if (c == '"') {
+            in_quotes = !in_quotes;
+            continue;
+        }
+        if ((c == ' ' || c == '\t') && !in_quotes) {
+            if (idx > 0) {
+                arg_buf[idx] = '\0';
+                args[argc++] = dup_string(arg_buf);
+                idx = 0;
+            }
+            continue;
+        }
+        if (idx < MAX_INPUT - 1) {
+            arg_buf[idx++] = c;
+        }
+    }
 
-  while (*buf != '\0' && i < MAX_ARGS - 1) {
-      char c = *buf;
-
-        // TODO: 在这里添加你的代码
-        // I AM NOT DONE
-
-      buf++;
-  }
-
-  // 处理最后一个参数（循环结束后可能还有未加入的）
-  if (arg_buf_idx > 0) {
-      arg_buf[arg_buf_idx] = '\0';
-      args[i++] = strdup(arg_buf);
-  }
-
-  args[i] = NULL;  // exec-style NULL结尾
-  return i;
+    if (idx > 0 && argc < MAX_ARGS - 1) {
+        arg_buf[idx] = '\0';
+        args[argc++] = dup_string(arg_buf);
+    }
+    args[argc] = NULL;
+    return argc;
 }
 
-// ======================
-// 主函数：命令循环 & 自定义命令分发
-// ======================
+static void run_command(int argc, char **args) {
+    if (argc == 0 || is_builtin_command(args)) {
+        return;
+    }
+
+    const char *cmd_name = args[0];
+    const char *cmd_arg1 = argc >= 2 ? args[1] : NULL;
+    const char *cmd_arg2 = argc >= 3 ? args[2] : NULL;
+
+    for (Command *cmd = commands; cmd->name != NULL; cmd++) {
+        if (strcmp(cmd_name, cmd->name) != 0) {
+            continue;
+        }
+        if (cmd->argc_required == 0) {
+            cmd->func.func_0();
+        } else if (cmd->argc_required == 1) {
+            cmd->func.func_1(cmd_arg1);
+        } else {
+            cmd->func.func_2(cmd_arg1, cmd_arg2);
+        }
+        return;
+    }
+
+    fprintf(stderr, "mybash: command not found: %s\n", cmd_name);
+}
 
 int main(int argc, char *argv[]) {
-  char input[MAX_INPUT];
-  char *args[MAX_ARGS];
+    char input[MAX_INPUT];
+    char *args[MAX_ARGS] = {0};
 
-  if (argc > 1) {
-    // 从文件读取命令
-    const char *filename = argv[1];
-    FILE *file = fopen(filename, "r");
-    if (!file) {
-      printf("mybash: cannot open file: %s\n", filename);
-      return 1;
-    }
-
-    printf("mybash: reading commands from file '%s'\n", filename);
-
-    while (fgets(input, sizeof(input), file)) {
-      // 去掉末尾换行符
-      input[strcspn(input, "\n")] = '\0';
-
-      int argc_parsed = parse_input(input, args);
-
-      if (argc_parsed == 0) {
-        continue;  // 空行
-      }
-
-      // 处理内置命令
-      if (is_builtin_command(args)) {
-        continue;
-      }
-
-      // 处理自定义命令
-      const char *cmd_name = args[0];
-      const char *cmd_arg1 = (argc_parsed >= 2) ? args[1] : NULL;
-      const char *cmd_arg2 = (argc_parsed >= 3) ? args[2] : NULL;
-
-      printf("cmd_name: %s\n", cmd_name);
-      printf("cmd_arg1: %s\n", cmd_arg1);
-      printf("cmd_arg2: %s\n", cmd_arg2);
-
-      int found = 0;
-      for (Command *cmd = commands; cmd->name != NULL; cmd++) {
-        if (strcmp(cmd_name, cmd->name) == 0) {
-          found = 1;
-          if (cmd->is_arg_required == 0) {
-            cmd->func.func_0();
-          } else if (cmd->is_arg_required == 1) {
-            cmd->func.func_1(cmd_arg1);
-          } else if (cmd->is_arg_required == 2) {
-            cmd->func.func_2(cmd_arg1, cmd_arg2);
-          }
-          break;
+    if (argc > 1) {
+        FILE *file = fopen(argv[1], "r");
+        if (!file) {
+            printf("mybash: cannot open file: %s\n", argv[1]);
+            return 1;
         }
-      }
-
-      if (!found) {
-        fprintf(stderr, "mybash: command not found: %s\n", cmd_name);
-      }
+        while (fgets(input, sizeof(input), file)) {
+            input[strcspn(input, "\r\n")] = '\0';
+            int parsed = parse_input(input, args);
+            run_command(parsed, args);
+            free_args(args);
+        }
+        fclose(file);
+        return 0;
     }
 
-    fclose(file);
-    return 0;
-  } 
-  else {
-    // 🔁 原有的交互式命令行模式
     while (1) {
-      printf("mybash$ ");
-      fflush(stdout);
-
-      if (fgets(input, sizeof(input), stdin) == NULL) {
-        printf("\n");
-        break;
-      }
-
-      input[strcspn(input, "\n")] = '\0';
-
-      int argc = parse_input(input, args);
-
-      if (argc == 0) {
-        continue;
-      }
-
-      if (is_builtin_command(args)) {
-        continue;
-      }
-
-      const char *cmd_name = args[0];
-      const char *cmd_arg = (argc >= 2) ? args[1] : NULL;
-
-      int found = 0;
-      for (Command *cmd = commands; cmd->name != NULL; cmd++) {
-        if (strcmp(cmd_name, cmd->name) == 0) {
-          found = 1;
-          if (cmd->is_arg_required == 0) {
-            cmd->func.func_0();
-          } else if (cmd->is_arg_required == 1) {
-            cmd->func.func_1(cmd_arg);
-          } else if (cmd->is_arg_required == 2) {
-            cmd->func.func_2(cmd_arg, cmd_arg);
-          }
-          break;
+        printf("mybash$ ");
+        fflush(stdout);
+        if (!fgets(input, sizeof(input), stdin)) {
+            break;
         }
-      }
-
-      if (!found) {
-        fprintf(stderr, "mybash: command not found: %s\n", cmd_name);
-      }
+        input[strcspn(input, "\r\n")] = '\0';
+        int parsed = parse_input(input, args);
+        run_command(parsed, args);
+        free_args(args);
     }
-  }
 
-  return 0;
+    return 0;
 }

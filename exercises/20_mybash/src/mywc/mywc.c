@@ -1,96 +1,100 @@
 #include "mywc.h"
 
-// 创建哈希表
-WordCount **wc_create_hash_table() {
-  WordCount **hash_table = calloc(HASH_SIZE, sizeof(WordCount *));
-  return hash_table;
+WordCount **wc_create_hash_table(void) {
+    return calloc(HASH_SIZE, sizeof(WordCount *));
 }
 
-// 简单的哈希函数
 unsigned int hash(const char *word) {
-  unsigned long hash = 5381;
-  int c;
-  while ((c = *word++))
-    hash = ((hash << 5) + hash) + c; // hash * 33 + c
-  return hash % HASH_SIZE;
-}
-
-// 检查字符是否构成单词的一部分
-bool is_valid_word_char(char c) { return isalpha(c) || c == '\''; }
-
-// 转换为小写
-char to_lower(char c) { return tolower(c); }
-
-// 添加单词到哈希表
-void add_word(WordCount **hash_table, const char *word) {
-  unsigned int index = hash(word);
-  WordCount *entry = hash_table[index];
-
-    // TODO: 在这里添加你的代码
-    // I AM NOT DONE
-}
-
-// 打印单词统计结果
-void print_word_counts(WordCount **hash_table) {
-  printf("Word Count Statistics:\n");
-  printf("======================\n");
-
-    // TODO: 在这里添加你的代码
-    // I AM NOT DONE
-}
-
-// 释放哈希表内存
-void wc_free_hash_table(WordCount **hash_table) {
-  for (int i = 0; i < HASH_SIZE; i++) {
-    WordCount *entry = hash_table[i];
-    while (entry != NULL) {
-      WordCount *temp = entry;
-      entry = entry->next;
-      free(temp);
+    unsigned long h = 5381;
+    int c;
+    while ((c = (unsigned char)*word++) != 0) {
+        h = ((h << 5) + h) + (unsigned long)c;
     }
-  }
-  free(hash_table);
+    return (unsigned int)(h % HASH_SIZE);
 }
 
-// 处理文件并统计单词
+bool is_valid_word_char(char c) {
+    return isalpha((unsigned char)c) || c == '\'';
+}
+
+char to_lower(char c) {
+    return (char)tolower((unsigned char)c);
+}
+
+void add_word(WordCount **hash_table, const char *word) {
+    unsigned int index = hash(word);
+    for (WordCount *entry = hash_table[index]; entry; entry = entry->next) {
+        if (strcmp(entry->word, word) == 0) {
+            entry->count++;
+            return;
+        }
+    }
+    WordCount *entry = calloc(1, sizeof(*entry));
+    if (!entry) {
+        exit(EXIT_FAILURE);
+    }
+    strncpy(entry->word, word, sizeof(entry->word) - 1);
+    entry->count = 1;
+    entry->next = hash_table[index];
+    hash_table[index] = entry;
+}
+
+void print_word_counts(WordCount **hash_table) {
+    printf("Word Count Statistics:\n");
+    printf("======================\n");
+    for (int i = 0; i < HASH_SIZE; i++) {
+        for (WordCount *entry = hash_table[i]; entry; entry = entry->next) {
+            printf("%-20s %d\n", entry->word, entry->count);
+        }
+    }
+}
+
+void wc_free_hash_table(WordCount **hash_table) {
+    for (int i = 0; i < HASH_SIZE; i++) {
+        WordCount *entry = hash_table[i];
+        while (entry) {
+            WordCount *next = entry->next;
+            free(entry);
+            entry = next;
+        }
+    }
+    free(hash_table);
+}
+
 void process_file(const char *filename) {
-  FILE *file = fopen(filename, "r");
-  if (!file) {
-    perror("Error opening file");
-    exit(EXIT_FAILURE);
-  }
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        perror("Error opening file");
+        return;
+    }
 
-  WordCount **hash_table = wc_create_hash_table();
-  char word[MAX_WORD_LEN];
-  int word_pos = 0;
-  int c;
+    WordCount **hash_table = wc_create_hash_table();
+    char word[MAX_WORD_LEN];
+    int word_pos = 0;
+    int c;
 
-  while ((c = fgetc(file)) != EOF) {
-    if (is_valid_word_char(c)) {
-      if (word_pos < MAX_WORD_LEN - 1) {
-        word[word_pos++] = to_lower(c);
-      }
-    } else {
-      if (word_pos > 0) {
+    while ((c = fgetc(file)) != EOF) {
+        if (is_valid_word_char((char)c)) {
+            if (word_pos < MAX_WORD_LEN - 1) {
+                word[word_pos++] = to_lower((char)c);
+            }
+        } else if (word_pos > 0) {
+            word[word_pos] = '\0';
+            add_word(hash_table, word);
+            word_pos = 0;
+        }
+    }
+    if (word_pos > 0) {
         word[word_pos] = '\0';
         add_word(hash_table, word);
-        word_pos = 0;
-      }
     }
-  }
 
-  // 处理文件末尾的最后一个单词
-  if (word_pos > 0) {
-    word[word_pos] = '\0';
-    add_word(hash_table, word);
-  }
-
-  fclose(file);
-  print_word_counts(hash_table);
-  wc_free_hash_table(hash_table);
+    fclose(file);
+    print_word_counts(hash_table);
+    wc_free_hash_table(hash_table);
 }
 
-int __cmd_mywc(const char* filename) {
-  process_file(filename);
-  return 0;
+int __cmd_mywc(const char *filename) {
+    process_file(filename);
+    return 0;
 }

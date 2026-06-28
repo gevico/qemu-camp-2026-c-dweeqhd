@@ -1,36 +1,46 @@
-# =============================================
-# 主 Makefile
-# 功能：
-#   - mybash：生成二进制，放到 bin/
-#   - 其他模块（mysed, myfile, mywc, mytrans）：生成静态库 .a，放到 obj/xxx/，.o 放到 obj/xxx/（或 out/，但建议统一）
-#   - 所有子模块 Makefile 应支持 OBJDIR 和 BINDIR 参数
-# =============================================
+CC = gcc
+CFLAGS = -Wall -Wextra -std=c11 -g -O2 -fPIE -Iinclude
+LDFLAGS = -pie
 
-PWD := $(shell pwd)
+BINDIR = bin
+OBJDIR = obj
+TARGET = $(BINDIR)/mybash
 
-# 所有子模块目录（静态库：生成 .a）
-SUBDIRS := \
-	mysed \
-	myfile \
-	mywc \
-	mytrans
+OBJS = \
+	$(OBJDIR)/mybash/main.o \
+	$(OBJDIR)/myfile/myfile.o \
+	$(OBJDIR)/mysed/mysed.o \
+	$(OBJDIR)/mytrans/mytrans.o \
+	$(OBJDIR)/mytrans/myhash.o \
+	$(OBJDIR)/mywc/mywc.o
 
-# 默认目标：构建 mybash（依赖其他库）
-all: mybash
+all: $(TARGET)
 
-# 通用规则：构建每个子模块（静态库）
-$(SUBDIRS):
-    # TODO: 在这里添加你的代码
-    # I AM NOT DONE
+$(TARGET): $(OBJS) | $(BINDIR)
+	$(CC) $(LDFLAGS) -o $@ $(OBJS)
 
-# 构建 mybash（可执行文件，依赖上面的库）
-mybash: $(SUBDIRS)
-	# TODO: 在这里添加你的代码
-    # I AM NOT DONE
+$(OBJDIR)/mybash/main.o: src/mybash/main.c include/common.h | $(OBJDIR)/mybash
+	$(CC) $(CFLAGS) -c -o $@ $<
 
-# 清理所有生成的文件
+$(OBJDIR)/myfile/myfile.o: src/myfile/myfile.c src/myfile/myfile.h include/common.h | $(OBJDIR)/myfile
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(OBJDIR)/mysed/mysed.o: src/mysed/mysed.c src/mysed/mysed.h include/common.h | $(OBJDIR)/mysed
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(OBJDIR)/mytrans/mytrans.o: src/mytrans/mytrans.c src/mytrans/myhash.h include/common.h | $(OBJDIR)/mytrans
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(OBJDIR)/mytrans/myhash.o: src/mytrans/myhash.c src/mytrans/myhash.h include/common.h | $(OBJDIR)/mytrans
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(OBJDIR)/mywc/mywc.o: src/mywc/mywc.c src/mywc/mywc.h include/common.h | $(OBJDIR)/mywc
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BINDIR) $(OBJDIR)/mybash $(OBJDIR)/myfile $(OBJDIR)/mysed $(OBJDIR)/mytrans $(OBJDIR)/mywc:
+	mkdir -p $@
+
 clean:
-    # TODO: 在这里添加你的代码
-    # I AM NOT DONE
+	rm -rf $(BINDIR) $(OBJDIR)
 
-.PHONY: all $(SUBDIRS) mybash clean
+.PHONY: all clean

@@ -1,30 +1,20 @@
 #include <stdio.h>
 
-// TODO：定义四则运算规则
-// hint：似乎除数有一些特殊情况，需要处理
+static int add(int a, int b) { return a + b; }
+static int subtract(int a, int b) { return a - b; }
+static int multiply(int a, int b) { return a * b; }
+static int divide_int(int a, int b) { return a / b; }
 
-// I AM NOT DONE
-int add(int a, int b) {  }
-int subtract(int a, int b) {  }
-int multiply(int a, int b) {  }
-int divide(int a, int b) {  }
-
-
-
-int main() {
+int main(void) {
     int a, b;
     char op;
-
-    // TODO
-    // hint:这是一个函数指针数组，在这之前应该先定义指针
-    int ()() = {add, subtract, multiply, divide};
-
+    int (*operations[])(int, int) = {add, subtract, multiply, divide_int};
     char operators[] = "+-*/";
 
-    printf("输入两个整数和一个运算符 (+, -, *, /): ");
-    scanf("%d %d %c", &a, &b, &op);
+    if (scanf("%d %d %c", &a, &b, &op) != 3) {
+        return 1;
+    }
 
-    // 查找对应的运算符索引
     int index = -1;
     for (int i = 0; i < 4; i++) {
         if (op == operators[i]) {
@@ -33,13 +23,15 @@ int main() {
         }
     }
 
-    if (index == -1) {
-        printf("无效的运算符\n");
-        return 1;
+    if (index < 0) {
+        printf("error: invalid operator\n");
+        return 0;
+    }
+    if (op == '/' && b == 0) {
+        printf("error: division by zero\n");
+        return 0;
     }
 
-    int result = operations[index](a, b);
-    printf("%d %c %d = %d\n", a, op, b, result);
-
+    printf("%d %c %d = %d\n", a, op, b, operations[index](a, b));
     return 0;
 }
